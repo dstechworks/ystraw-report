@@ -94,7 +94,7 @@ async function dailyReportDetailed() {
 
         const array_to_sheet = XLSX.utils.aoa_to_sheet(dataArray);
         XLSX.utils.book_append_sheet(workbook, array_to_sheet, 'Daily Detailed Report');
-        mtdReportDetailed();
+        // mtdReportDetailed();
     } else {
         console.log('NO DATA GET FROM SERVER !!');
     }
