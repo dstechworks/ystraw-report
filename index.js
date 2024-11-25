@@ -94,7 +94,7 @@ async function dailyReportDetailed() {
 
         const array_to_sheet = XLSX.utils.aoa_to_sheet(dataArray);
         XLSX.utils.book_append_sheet(workbook, array_to_sheet, 'Daily Detailed Report');
-        // mtdReportDetailed();
+        mtdReportDetailed();
     } else {
         console.log('NO DATA GET FROM SERVER !!');
     }
@@ -127,32 +127,32 @@ const mtdReportDetailed = () => {
 
     const dataArray = [[
         'Display Name',
-        'Date', 'City',
+        // 'Date', 'City',
         'Outlet Name',
-        'Outlet Address',
+        // 'Outlet Address',
         'Operation Days',
         'Active Days',
-        '% Active Days',
-        'Runtime',
-        'Average Daily Runtime',
-        'New Metric Efficiency',
-        'Bucket',
-        'Remarks',
-        'Active',
-        'Run Day Scoring',
-        'Time score',
-        'Run days Scoring (Max 10) No of days Active/ No of Total days in Month *10 Max Score',
-        'Run Time Scoring (Max 10) Avg. No of Hour Active/ Avg. 8 Hours Run *10 Max Score',
-        'Cummalative Score',
-        'Cummalative Rating'
+        // '% Active Days',
+        'Runtime In Hrs',
+        // 'Average Daily Runtime',
+        // 'New Metric Efficiency',
+        // 'Bucket',
+        // 'Remarks',
+        // 'Active',
+        // 'Run Day Scoring',
+        // 'Time score',
+        // 'Run days Scoring (Max 10) No of days Active/ No of Total days in Month *10 Max Score',
+        // 'Run Time Scoring (Max 10) Avg. No of Hour Active/ Avg. 8 Hours Run *10 Max Score',
+        // 'Cummalative Score',
+        // 'Cummalative Rating'
     ]];
     let dim = [];
 
-    if (response1?.rows?.length > 0) {
+    if (response2?.rows?.length > 0) {
         const excelArrayData = XLSX.utils.sheet_to_json(worksheet);
 
         excelArrayData.forEach(element => {
-            const idDataFromDatabase = response1.rows.filter(d => d.display_id == element['Display ID']);
+            const idDataFromDatabase = response2.rows.filter(d => d.display_id == element['Display ID']);
 
             // console.log(idDataFromDatabase);
 
@@ -262,25 +262,25 @@ const mtdReportDetailed = () => {
 
 
                 dim.push(idDataFromDatabase[0]?.display_name);
-                dim.push(current_date);
-                dim.push(city);
+                // dim.push(current_date);
+                // dim.push(city);
                 dim.push(outletName);
-                dim.push(outletAddress);
+                // dim.push(outletAddress);
                 dim.push(calculatedDateDiff); // Operation Days
                 dim.push(activeDays); // Active Days
-                dim.push(percentageOfActiveDays); // % Active Days
+                // dim.push(percentageOfActiveDays); // % Active Days
                 dim.push(totalRunTime); // Runtime
-                dim.push(averageRunTime); // Average Daily Runtime
-                dim.push(showMetricEfficiency); // New Metric Efficiency
-                dim.push(bucket); // Bucket
-                dim.push(remarks); // remarks
-                dim.push(isactive); // Active
-                dim.push(showRunDayScoring); // Run Day Scoring
-                dim.push(showTimeScore); // Time score
-                dim.push(t1.toFixed(2)); // Run days Scoring 1
-                dim.push(t2); // Run days Scoring 2
-                dim.push(cummalativescore); // Cummalative Score
-                dim.push(cummalativerating); // Cummalative Rating
+                // dim.push(averageRunTime); // Average Daily Runtime
+                // dim.push(showMetricEfficiency); // New Metric Efficiency
+                // dim.push(bucket); // Bucket
+                // dim.push(remarks); // remarks
+                // dim.push(isactive); // Active
+                // dim.push(showRunDayScoring); // Run Day Scoring
+                // dim.push(showTimeScore); // Time score
+                // dim.push(t1.toFixed(2)); // Run days Scoring 1
+                // dim.push(t2); // Run days Scoring 2
+                // dim.push(cummalativescore); // Cummalative Score
+                // dim.push(cummalativerating); // Cummalative Rating
 
                 dataArray.push(dim)
 
