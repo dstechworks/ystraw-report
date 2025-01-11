@@ -8,8 +8,8 @@ const transporter = nodemailer.createTransport({
     port: 465,
     secure: true,
     auth: {
-        user: 'reports@techworks.co.in',
-        pass: 'vucto0-socWiz-cifjaj'
+        user: 'hitesh.kumar@techworks.co.in',
+        pass: '4VqvS&RY*ZFnqaU1'
     }
 });
 const pool = new Pool({
