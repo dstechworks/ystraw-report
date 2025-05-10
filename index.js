@@ -1,6 +1,9 @@
+const { google } = require('googleapis');
 const { Pool } = require('pg');
+
 const XLSX = require('xlsx');
 const nodemailer = require("nodemailer");
+const path = require('path');
 
 
 const transporter = nodemailer.createTransport({
@@ -30,17 +33,101 @@ let firstDate = `${year}-${month}-01`;
 let current_date = `${year}-${month}-${day}`;
 let dateDifference = new Date(current_date).getDate() + 1 - new Date(firstDate).getDate();
 
-const localWorkbook = XLSX.readFile('/root/YSTRAW-REPORT/YSTRAW_BASE_SHEET.xlsx');
-const sheetName = localWorkbook.SheetNames[0];
-const worksheet = localWorkbook.Sheets[sheetName];
+const spreadsheetId = "1-7-foeW5MbN-r-argSr8vtjY8VFZqK2b5m4telGohW0";
 const workbook = XLSX.utils.book_new();
 
+let workbookData = {};
 let response1;
 let response2;
 
 async function querydb() {
+    let getYstrawBaseSheetData = await getDataFromGoogleSheets(spreadsheetId, 'BaseSheetCall');
+    console.log("YSTRAW BASE DATA SHEET ::", workbookData['Yellow Straw Installation'].length);
+
     response1 = await pool.query(`select * from ystraw_data_table  where custom_date = '${current_date}'`);
     response2 = await pool.query(`select * from ystraw_data_table where custom_date >= '${firstDate}' and custom_date <= '${current_date}'`);
+}
+
+function extractDeviceId(text) {
+    const match = text.match(/\b[A-Z]{2}-\d{3,4}\b/i);
+    return match ? match[0] : null;
+}
+
+async function getDataFromGoogleSheets(sheetID, reference) {
+    const accessGoogleSheet = async () => {
+        try {
+            // Initialize the authentication client
+            const auth = new google.auth.GoogleAuth({
+                keyFile: "./credentials.json",
+                scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+            });
+
+            // Get the authenticated client
+            const authClientObject = await auth.getClient();
+
+            // Create the Sheets instance
+            const sheets = google.sheets({ version: 'v4', auth: authClientObject });
+
+            return sheets; // Return the sheets instance
+        } catch (error) {
+            console.error("Error initializing Google Sheets API:", error);
+            throw error;
+        }
+    };
+
+    const getAllWorkbookNames = async (sheets) => {
+        try {
+            // Get workbook names present in the spreadsheet
+            const response = await sheets.spreadsheets.get({
+                spreadsheetId: sheetID,
+            });
+
+            const sheetNames = response.data.sheets.map(sheet => sheet.properties.title);
+            // console.log('\n');
+            // console.log('Sheet Names:', sheetNames);
+
+            return sheetNames; // Return the sheet names
+        } catch (error) {
+            console.error("Error fetching workbook names:", error);
+            throw error;
+        }
+    };
+
+    const getWorkbookWiseData = async (sheets, sheetNames) => {
+        try {
+            for (let i = 0; i < sheetNames.length; i++) {
+                const sheetName = sheetNames[i];
+                // Fetch data for each sheet
+                const response = await sheets.spreadsheets.values.get({
+                    spreadsheetId: sheetID,
+                    range: sheetName,
+                });
+
+                const data = response.data.values || [];
+                console.log(`Data for ${sheetName}:`, data.length);
+
+                // Change array of array data to array of objects like API response
+                const [headers, ...rows] = data;
+                let result = rows.map(row => Object.fromEntries(headers.map((key, index) => [key, row[index]])));
+                result = result.filter(i => i['Device Status Remark'] == 'Active');
+                workbookData[sheetName] = result;
+            }
+        } catch (error) {
+            console.error("Error fetching data for sheets:", error);
+            throw error;
+        }
+
+        return true;
+    };
+
+    try {
+        let sheets = await accessGoogleSheet();
+        let sheetNames = await getAllWorkbookNames(sheets);
+        let getWorkbookRes = await getWorkbookWiseData(sheets, ['Yellow Straw Installation']);
+        return getWorkbookRes;
+    } catch (error) {
+        console.error("Error during Google Sheets data retrieval:", error);
+    }
 }
 
 async function dailyReportDetailed() {
@@ -49,6 +136,7 @@ async function dailyReportDetailed() {
     let outletAddress = '';
     let lastAccessed = '';
     const dataArray = [[
+        'Device ID',
         'Display ID',
         'Display Name',
         'Date',
@@ -61,17 +149,18 @@ async function dailyReportDetailed() {
     let dim = [];
 
     if (response1?.rows?.length > 0) {
-        const excelArrayData = XLSX.utils.sheet_to_json(worksheet);
-
-        excelArrayData.forEach((element, index) => {
+        workbookData['Yellow Straw Installation'].forEach((element, index) => {
             let idDataFromDatabase = response1.rows.find(d => d.display_id == element['Display ID']);
+            // console.log(idDataFromDatabase);
+
 
             if (idDataFromDatabase) {
                 city = element['City'] ? element['City'] : '';
                 outletName = element['Outlet Name'] ? element['Outlet Name'] : '';
-                outletAddress = element['Outlet Address'] ? element['Outlet Address'] : '';
+                outletAddress = element['Address'] ? element['Address'] : '';
                 lastAccessed = idDataFromDatabase?.last_accessed ? idDataFromDatabase?.last_accessed : '';
 
+                dim.push(extractDeviceId(idDataFromDatabase.display_name));
                 dim.push(idDataFromDatabase?.display_id);
                 dim.push(idDataFromDatabase?.display_name);
                 dim.push((idDataFromDatabase?.custom_date)?.toString().substring(4, 15));
@@ -126,6 +215,8 @@ const mtdReportDetailed = () => {
     let cummalativerating;
 
     const dataArray = [[
+        // 'Device ID',
+        // 'Display ID',
         'Display Name',
         // 'Date', 'City',
         'Outlet Name',
@@ -149,10 +240,8 @@ const mtdReportDetailed = () => {
     let dim = [];
 
     if (response2?.rows?.length > 0) {
-        const excelArrayData = XLSX.utils.sheet_to_json(worksheet);
-
-        excelArrayData.forEach(element => {
-            const idDataFromDatabase = response2.rows.filter(d => d.display_id == element['Display ID']);
+        workbookData['Yellow Straw Installation'].forEach(element => {
+            let idDataFromDatabase = response2.rows.filter(d => d.display_id == element['Display ID']);
 
             // console.log(idDataFromDatabase);
 
@@ -163,7 +252,7 @@ const mtdReportDetailed = () => {
             } else {
                 city = element['City'];
                 outletName = element['Outlet Name'];
-                outletAddress = element['Outlet Address'];
+                outletAddress = element['Address'];
             }
 
             if (Number(idDataFromDatabase.length) <= 1) {
@@ -260,7 +349,8 @@ const mtdReportDetailed = () => {
                 // console.log(`Cummalative Score : ${cummalativescore}`);
                 // console.log(`Cummalative Rating : ${cummalativerating}`);
 
-
+                // dim.push(extractDeviceId(idDataFromDatabase[0].display_name));
+                // dim.push(idDataFromDatabase[0]?.display_id);
                 dim.push(idDataFromDatabase[0]?.display_name);
                 // dim.push(current_date);
                 // dim.push(city);
@@ -326,9 +416,9 @@ async function reportDelivery(params) {
         // send mail with defined transport object
         const info = await transporter.sendMail({
             from: 'reports@techworks.co.in',
-            // to: 'hitesh.kumar@techworks.co.in',
-            to: 'vivekmry1995@gmail.com, radhika@ystraw.com, dhruv@techworks.co.in',
-            cc: "Aaditya@techworks.co.in, kunal.m@techworks.co.in, rahul.rajput@techworks.co.in, hitesh.kumar@techworks.co.in",
+            to: 'hitesh.kumar@techworks.co.in',
+            // to: 'vivekmry1995@gmail.com, radhika@ystraw.com, dhruv@techworks.co.in',
+            // cc: "Aaditya@techworks.co.in, kunal.m@techworks.co.in, rahul.rajput@techworks.co.in, hitesh.kumar@techworks.co.in",
             subject: "YSTRAW REPORT TILL" + current_date, // Subject line
             html: `<h6>Please find the attachment.</h6>
             <p>&nbsp;</p>
@@ -445,17 +535,26 @@ Promise.all([querydb()]).then(() => {
         dailyReportDetailed()
     ])
         .then(() => {
-            setTimeout(() => {
-                const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
-                const fileName = 'YSTRAW REPORT TILL' + current_date + '.xlsx'
-                XLSX.writeFile(workbook, fileName);
-            }, 3000);
-
-            setTimeout(() => {
-                reportDelivery();
-            }, 10000);
+            // Save the Excel file
+            const fileName = 'YSTRAW REPORT TILL' + current_date + '.xlsx';
+            const filePath = path.join(__dirname, fileName);
+            
+            try {
+                // Write the workbook to file
+                XLSX.writeFile(workbook, filePath);
+                console.log(`Excel file saved successfully at: ${filePath}`);
+                
+                // Send email with attachment after file is saved
+                // return reportDelivery();
+            } catch (error) {
+                console.error("Error saving Excel file:", error);
+                throw error;
+            }
+        })
+        .then(() => {
+            console.log("Process completed successfully - file saved and email sent");
         })
         .catch((error) => {
             console.error("An error occurred:", error);
-        })
-})
+        });
+});
